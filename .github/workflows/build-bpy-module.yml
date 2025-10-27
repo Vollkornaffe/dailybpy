@@ -1,0 +1,193 @@
+name: Build Blender bpy Module
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Blender repository
+        uses: actions/checkout@v4
+        with:
+          repository: "blender/blender"
+          fetch-depth: 1 # Shallow clone
+          submodules: "recursive"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake git subversion \
+            libx11-dev libxxf86vm-dev libxcursor-dev libxi-dev \
+            libxrandr-dev libxinerama-dev libegl-dev \
+            libwayland-dev wayland-protocols libxkbcommon-dev libdbus-1-dev linux-libc-dev
+
+      - name: Update libraries
+        run: |
+          make update
+
+      - name: Build bpy module
+        run: |
+          make bpy
+
+      - name: Create wheel package
+        run: |
+          python3 ./build_files/utils/make_bpy_wheel.py ../build_linux_bpy/bin/
+
+      - name: Find wheel file
+        id: find_wheel
+        run: |
+          WHEEL_FILE=$(ls ../build_linux_bpy/bin/bpy-*.whl | head -1)
+          echo "wheel_path=$WHEEL_FILE" >> $GITHUB_OUTPUT
+          echo "wheel_name=$(basename $WHEEL_FILE)" >> $GITHUB_OUTPUT
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bpy-linux-x64
+          path: ${{ steps.find_wheel.outputs.wheel_path }}
+          retention-days: 30
+
+  build-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Blender repository
+        uses: actions/checkout@v4
+        with:
+          repository: "blender/blender"
+          fetch-depth: 1 # Shallow clone
+          submodules: "recursive"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          brew install cmake
+
+      - name: Update libraries
+        run: |
+          make update
+
+      - name: Build bpy module
+        run: |
+          make bpy
+
+      - name: Create wheel package
+        run: |
+          python3 ./build_files/utils/make_bpy_wheel.py ../build_darwin_bpy/bin/
+
+      - name: Find wheel file
+        id: find_wheel
+        run: |
+          WHEEL_FILE=$(ls ../build_darwin_bpy/bin/bpy-*.whl | head -1)
+          echo "wheel_path=$WHEEL_FILE" >> $GITHUB_OUTPUT
+          echo "wheel_name=$(basename $WHEEL_FILE)" >> $GITHUB_OUTPUT
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bpy-macos-arm64
+          path: ${{ steps.find_wheel.outputs.wheel_path }}
+          retention-days: 30
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Blender repository
+        uses: actions/checkout@v4
+        with:
+          repository: "blender/blender"
+          fetch-depth: 1 # Shallow clone
+          submodules: "recursive"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Visual Studio
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Update libraries
+        shell: cmd
+        run: |
+          make.bat update
+
+      - name: Build bpy module
+        shell: cmd
+        run: |
+          make.bat bpy
+
+      - name: Create wheel package
+        shell: bash
+        run: |
+          python ./build_files/utils/make_bpy_wheel.py ../build_windows_bpy/bin/
+
+      - name: Find wheel file
+        id: find_wheel
+        shell: bash
+        run: |
+          WHEEL_FILE=$(ls ../build_windows_bpy/bin/bpy-*.whl | head -1)
+          echo "wheel_path=$WHEEL_FILE" >> $GITHUB_OUTPUT
+          echo "wheel_name=$(basename $WHEEL_FILE)" >> $GITHUB_OUTPUT
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bpy-windows-x64
+          path: ${{ steps.find_wheel.outputs.wheel_path }}
+          retention-days: 30
+
+  create-release:
+    needs: [build-linux, build-macos-arm, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: daily-${{ steps.date.outputs.date }}
+          name: Daily bpy Build ${{ steps.date.outputs.date }}
+          body: |
+            Automated daily build of Blender as a Python module (bpy)
+
+            ## Installation
+            Download the appropriate wheel file for your platform and install with pip:
+            ```bash
+            pip install bpy-*.whl
+            ```
+
+            ## Testing
+            ```python
+            python -c "import bpy; bpy.ops.render.render(write_still=True)"
+            ```
+
+            **Note:** Python 3.11 is required for these builds.
+          draft: false
+          prerelease: false
+          files: |
+            ./artifacts/**/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
