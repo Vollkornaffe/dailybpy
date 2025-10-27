@@ -41,7 +41,8 @@ jobs:
 
       - name: Create wheel package
         run: |
-          python3 ./build_files/utils/make_bpy_wheel.py ../build_linux_bpy/bin/
+          python -m pip install wheel setuptools
+          python ./build_files/utils/make_bpy_wheel.py ../build_linux_bpy/bin/
 
       - name: Find wheel file
         id: find_wheel
@@ -86,7 +87,8 @@ jobs:
 
       - name: Create wheel package
         run: |
-          python3 ./build_files/utils/make_bpy_wheel.py ../build_darwin_bpy/bin/
+          python -m pip install wheel setuptools
+          python ./build_files/utils/make_bpy_wheel.py ../build_darwin_bpy/bin/
 
       - name: Find wheel file
         id: find_wheel
@@ -133,6 +135,7 @@ jobs:
       - name: Create wheel package
         shell: bash
         run: |
+          python -m pip install wheel setuptools
           python ./build_files/utils/make_bpy_wheel.py ../build_windows_bpy/bin/
 
       - name: Find wheel file
