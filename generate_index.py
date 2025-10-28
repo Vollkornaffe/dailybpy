@@ -20,15 +20,31 @@ def normalize_package_name(name):
 def get_releases():
     """Fetch all releases using gh CLI."""
     try:
+        # First, get the list of release tags
         result = subprocess.run(
-            ["gh", "release", "list", "--json", "tagName,assets", "--limit", "100"],
+            ["gh", "release", "list", "--json", "tagName", "--limit", "100"],
             capture_output=True,
             text=True,
             check=True
         )
-        return json.loads(result.stdout)
+        releases = json.loads(result.stdout)
+
+        # Then fetch assets for each release
+        for release in releases:
+            tag = release["tagName"]
+            result = subprocess.run(
+                ["gh", "release", "view", tag, "--json", "assets"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            release_data = json.loads(result.stdout)
+            release["assets"] = release_data.get("assets", [])
+
+        return releases
     except subprocess.CalledProcessError as e:
         print(f"Error fetching releases: {e}")
+        print(f"stderr: {e.stderr if hasattr(e, 'stderr') else 'N/A'}")
         sys.exit(1)
     except FileNotFoundError:
         print("Error: gh CLI not found. Please install GitHub CLI.")
