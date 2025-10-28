@@ -1,6 +1,11 @@
+[![Building bpy](https://github.com/BradyAJohnston/dailybpy/actions/workflows/build-bpy-module.yml/badge.svg)](https://github.com/BradyAJohnston/dailybpy/actions/workflows/build-bpy-module.yml)
+[![Publish Package Index](https://github.com/BradyAJohnston/dailybpy/actions/workflows/publish-index.yml/badge.svg)](https://github.com/BradyAJohnston/dailybpy/actions/workflows/publish-index.yml)
+
 # Daily bpy Builds
 
-Automated daily builds of Blender as a Python module (bpy) for Linux, macOS (ARM64), and Windows.
+Automated daily builds of Blender as a Python module (bpy) for Linux, macOS (ARM64), and Windows. These builds are run daily from the `main` branch of the [Blender](https://github.com/Blender/blender) repo which is an official mirror of the [Gitea](https://projects.blender.org/Blender/blender) development.
+
+A repo for these builds is hosted at `bradyajohnston.github.io/dailybpy` so you can install using `uv` or `pip` from a custom repo to get the latest daily build as below.
 
 ## Requirements
 
@@ -10,11 +15,12 @@ Automated daily builds of Blender as a Python module (bpy) for Linux, macOS (ARM
 
 Install bpy using our custom package index, which automatically selects the correct platform:
 
+#### `uv`
 ```bash
-# Using uv (recommended)
 uv pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
-
-# Using pip
+```
+#### `pip`
+```bash
 pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
 ```
 
