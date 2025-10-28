@@ -22,6 +22,23 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Get current week
+        id: week
+        run: echo "week=$(date +'%Y-W%U')" >> $GITHUB_OUTPUT
+
+      - name: Cache Blender libraries
+        uses: actions/cache@v4
+        with:
+          path: lib
+          key: blender-lib-linux-${{ steps.week.outputs.week }}
+          restore-keys: |
+            blender-lib-linux-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: linux-bpy
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -37,6 +54,7 @@ jobs:
 
       - name: Build bpy module
         run: |
+          export PATH="/usr/lib/ccache:$PATH"
           make bpy
 
       - name: Create wheel package
@@ -71,6 +89,23 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Get current week
+        id: week
+        run: echo "week=$(date +'%Y-W%U')" >> $GITHUB_OUTPUT
+
+      - name: Cache Blender libraries
+        uses: actions/cache@v4
+        with:
+          path: lib
+          key: blender-lib-macos-arm64-${{ steps.week.outputs.week }}
+          restore-keys: |
+            blender-lib-macos-arm64-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: macos-arm64-bpy
+
       # cmake already installed on GHA runners
       # - name: Install dependencies
       #   run: |
@@ -82,6 +117,7 @@ jobs:
 
       - name: Build bpy module
         run: |
+          export PATH="$(brew --prefix)/opt/ccache/libexec:$PATH"
           make bpy
 
       - name: Create wheel package
@@ -116,6 +152,22 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Get current week
+        shell: bash
+        run: echo "week=$(date +'%Y-W%U')" >> $GITHUB_OUTPUT
+        id: week
+
+      - name: Cache Blender libraries
+        uses: actions/cache@v4
+        with:
+          path: lib
+          key: blender-lib-windows-x64-${{ steps.week.outputs.week }}
+          restore-keys: |
+            blender-lib-windows-x64-
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.8
+
       - name: Set up Visual Studio
         uses: microsoft/setup-msbuild@v2
 
@@ -126,6 +178,9 @@ jobs:
 
       - name: Build bpy module
         shell: cmd
+        env:
+          CC: sccache cl
+          CXX: sccache cl
         run: |
           make.bat bpy
 
@@ -135,17 +190,32 @@ jobs:
           $buildDir = Get-ChildItem -Path .. -Directory -Filter "build_windows*" | Select-Object -First 1 -ExpandProperty Name
           echo "BUILD_DIR=$buildDir" >> $env:GITHUB_ENV
 
+      - name: Debug - List build directory contents
+        shell: powershell
+        run: |
+          Write-Host "Contents of ../$env:BUILD_DIR/bin:"
+          Get-ChildItem -Path "..\$env:BUILD_DIR\bin" -Recurse -Depth 2 | Select-Object FullName
+
       - name: Create wheel package
-        shell: bash
+        shell: powershell
         run: |
           python -m pip install wheel setuptools
-          python ./build_files/utils/make_bpy_wheel.py "../$BUILD_DIR/bin/"
+          $binPath = "..\$env:BUILD_DIR\bin\Release"
+          if (-not (Test-Path $binPath)) {
+            $binPath = "..\$env:BUILD_DIR\bin"
+          }
+          Write-Host "Using bin path: $binPath"
+          python .\build_files\utils\make_bpy_wheel.py $binPath
 
       - name: Copy wheel to workspace
-        shell: bash
+        shell: powershell
         run: |
-          mkdir -p ./dist
-          cp "../$BUILD_DIR/bin/bpy-"*.whl ./dist/
+          New-Item -ItemType Directory -Force -Path .\dist
+          $binPath = "..\$env:BUILD_DIR\bin\Release"
+          if (-not (Test-Path $binPath)) {
+            $binPath = "..\$env:BUILD_DIR\bin"
+          }
+          Copy-Item -Path "$binPath\bpy-*.whl" -Destination .\dist\
 
       - name: Upload wheel as artifact
         uses: actions/upload-artifact@v4
