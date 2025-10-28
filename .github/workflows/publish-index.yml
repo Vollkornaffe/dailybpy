@@ -1,0 +1,60 @@
+name: Publish Package Index
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate PEP 503 index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python generate_index.py
+
+      - name: Create .nojekyll file
+        run: |
+          touch simple/.nojekyll
+
+      - name: Create CNAME file (if custom domain is configured)
+        run: |
+          # Optional: Add CNAME file if you have a custom domain
+          # echo "yourdomain.com" > simple/CNAME
+          echo "Skipping CNAME creation"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./simple
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build-index
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
