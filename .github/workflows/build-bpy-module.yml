@@ -18,7 +18,7 @@ jobs:
         id: check
         run: |
           # Find any blender-v*-release branches
-          BETA_BRANCH=$(git ls-remote --heads https://github.com/blender/blender.git | grep -o 'blender-v[0-9.]*-release' | head -n1)
+          BETA_BRANCH=$(git ls-remote --heads https://github.com/blender/blender.git | grep -o 'blender-v[0-9.]*-release' | tail -n1)
 
           if [ -n "$BETA_BRANCH" ]; then
             echo "Found beta branch: $BETA_BRANCH"
