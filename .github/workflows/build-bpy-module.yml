@@ -22,23 +22,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Get current week
-        id: week
-        run: echo "week=$(date +'%Y-W%U')" >> $GITHUB_OUTPUT
-
-      - name: Cache Blender libraries
-        uses: actions/cache@v4
-        with:
-          path: lib
-          key: blender-lib-linux-${{ steps.week.outputs.week }}
-          restore-keys: |
-            blender-lib-linux-
-
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: linux-bpy
-
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -54,7 +37,6 @@ jobs:
 
       - name: Build bpy module
         run: |
-          export PATH="/usr/lib/ccache:$PATH"
           make bpy
 
       - name: Create wheel package
@@ -89,23 +71,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Get current week
-        id: week
-        run: echo "week=$(date +'%Y-W%U')" >> $GITHUB_OUTPUT
-
-      - name: Cache Blender libraries
-        uses: actions/cache@v4
-        with:
-          path: lib
-          key: blender-lib-macos-arm64-${{ steps.week.outputs.week }}
-          restore-keys: |
-            blender-lib-macos-arm64-
-
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: macos-arm64-bpy
-
       # cmake already installed on GHA runners
       # - name: Install dependencies
       #   run: |
@@ -117,7 +82,6 @@ jobs:
 
       - name: Build bpy module
         run: |
-          export PATH="$(brew --prefix)/opt/ccache/libexec:$PATH"
           make bpy
 
       - name: Create wheel package
@@ -152,22 +116,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Get current week
-        shell: bash
-        run: echo "week=$(date +'%Y-W%U')" >> $GITHUB_OUTPUT
-        id: week
-
-      - name: Cache Blender libraries
-        uses: actions/cache@v4
-        with:
-          path: lib
-          key: blender-lib-windows-x64-${{ steps.week.outputs.week }}
-          restore-keys: |
-            blender-lib-windows-x64-
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.8
-
       - name: Set up Visual Studio
         uses: microsoft/setup-msbuild@v2
 
@@ -178,9 +126,6 @@ jobs:
 
       - name: Build bpy module
         shell: cmd
-        env:
-          CC: sccache cl
-          CXX: sccache cl
         run: |
           make.bat bpy
 
