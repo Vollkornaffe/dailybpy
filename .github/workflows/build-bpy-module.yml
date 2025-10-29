@@ -240,25 +240,17 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: daily-${{ steps.date.outputs.date }}
-          name: Daily bpy Build ${{ steps.date.outputs.date }}
+          name: ${{ steps.date.outputs.date }}
           body: |
-            Automated daily build of Blender as a Python module (bpy)
+            Automated daily builds of `bpy`
 
             ## Installation
-            Download the appropriate wheel file for your platform and install with pip:
             ```bash
-            pip install bpy-*.whl
+            pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
             ```
-
-            ## Testing
-            ```python
-            python -c "import bpy; bpy.ops.render.render(write_still=True)"
-            ```
-
-            **Note:** Python 3.11 is required for these builds.
           draft: false
           prerelease: false
           files: |
