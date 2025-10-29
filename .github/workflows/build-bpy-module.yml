@@ -7,13 +7,60 @@ on:
   workflow_dispatch: # Allow manual triggering
 
 jobs:
-  build-linux:
+  check-beta:
     runs-on: ubuntu-latest
+    outputs:
+      beta_active: ${{ steps.check.outputs.beta_active }}
+      beta_branch: ${{ steps.check.outputs.beta_branch }}
+      beta_version: ${{ steps.check.outputs.beta_version }}
+    steps:
+      - name: Check if beta period is active
+        id: check
+        run: |
+          # Find any blender-v*-release branches
+          BETA_BRANCH=$(git ls-remote --heads https://github.com/blender/blender.git | grep -o 'blender-v[0-9.]*-release' | head -n1)
+
+          if [ -n "$BETA_BRANCH" ]; then
+            echo "Found beta branch: $BETA_BRANCH"
+
+            # Extract version number (e.g., "5.0" from "blender-v5.0-release")
+            VERSION=$(echo "$BETA_BRANCH" | sed 's/blender-v\([0-9.]*\)-release/\1/')
+            echo "Beta version: $VERSION"
+
+            # Check if stable release tag exists (e.g., v5.0.0)
+            if git ls-remote --tags https://github.com/blender/blender.git | grep -q "refs/tags/v${VERSION}.0$"; then
+              echo "Stable v${VERSION}.0 released - beta period over"
+              echo "beta_active=false" >> $GITHUB_OUTPUT
+            else
+              echo "Beta period active for v${VERSION}"
+              echo "beta_active=true" >> $GITHUB_OUTPUT
+              echo "beta_branch=$BETA_BRANCH" >> $GITHUB_OUTPUT
+              echo "beta_version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No beta branch found"
+            echo "beta_active=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-linux:
+    needs: check-beta
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - branch: main
+            suffix: ""
+          - branch: ${{ needs.check-beta.outputs.beta_branch }}
+            suffix: "-beta"
+            version: ${{ needs.check-beta.outputs.beta_version }}
+    # Skip beta build if beta is not active
+    if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
     steps:
       - name: Checkout Blender repository
         uses: actions/checkout@v4
         with:
           repository: "blender/blender"
+          ref: ${{ matrix.branch }}
           fetch-depth: 1 # Shallow clone
           submodules: "recursive"
 
@@ -52,17 +99,29 @@ jobs:
       - name: Upload wheel as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bpy-linux-x64
+          name: bpy-linux-x64${{ matrix.suffix }}
           path: ./dist/*.whl
           retention-days: 30
 
   build-macos-arm:
+    needs: check-beta
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - branch: main
+            suffix: ""
+          - branch: ${{ needs.check-beta.outputs.beta_branch }}
+            suffix: "-beta"
+            version: ${{ needs.check-beta.outputs.beta_version }}
+    # Skip beta build if beta is not active
+    if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
     steps:
       - name: Checkout Blender repository
         uses: actions/checkout@v4
         with:
           repository: "blender/blender"
+          ref: ${{ matrix.branch }}
           fetch-depth: 1 # Shallow clone
           submodules: "recursive"
 
@@ -97,17 +156,29 @@ jobs:
       - name: Upload wheel as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bpy-macos-arm64
+          name: bpy-macos-arm64${{ matrix.suffix }}
           path: ./dist/*.whl
           retention-days: 30
 
   build-windows:
+    needs: check-beta
     runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - branch: main
+            suffix: ""
+          - branch: ${{ needs.check-beta.outputs.beta_branch }}
+            suffix: "-beta"
+            version: ${{ needs.check-beta.outputs.beta_version }}
+    # Skip beta build if beta is not active
+    if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
     steps:
       - name: Checkout Blender repository
         uses: actions/checkout@v4
         with:
           repository: "blender/blender"
+          ref: ${{ matrix.branch }}
           fetch-depth: 1 # Shallow clone
           submodules: "recursive"
 
@@ -165,39 +236,84 @@ jobs:
       - name: Upload wheel as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bpy-windows-x64
+          name: bpy-windows-x64${{ matrix.suffix }}
           path: ./dist/*.whl
           retention-days: 30
 
-  create-release:
-    needs: [build-linux, build-macos-arm, build-windows]
+  create-release-alpha:
+    needs: [check-beta, build-linux, build-macos-arm, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Download alpha artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: bpy-*
           path: ./artifacts
+        # Exclude beta artifacts by not downloading them
 
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
-      - name: Create Release
+      - name: Filter alpha artifacts only
+        run: |
+          mkdir -p ./alpha-artifacts
+          # Copy only non-beta artifacts
+          find ./artifacts -name "*.whl" -not -path "*-beta/*" -exec cp {} ./alpha-artifacts/ \;
+          ls -la ./alpha-artifacts/
+
+      - name: Create Alpha Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: daily-${{ steps.date.outputs.date }}
-          name: ${{ steps.date.outputs.date }}
+          name: Alpha ${{ steps.date.outputs.date }}
           body: |
-            Automated daily builds of `bpy`
+            Automated daily alpha builds of `bpy` from main branch
 
             ## Installation
             ```bash
             pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
             ```
           draft: false
-          prerelease: false
+          prerelease: true
+          files: |
+            ./alpha-artifacts/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-release-beta:
+    needs: [check-beta, build-linux, build-macos-arm, build-windows]
+    if: needs.check-beta.outputs.beta_active == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download beta artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bpy-*-beta
+          path: ./artifacts
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create Beta Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: beta-v${{ needs.check-beta.outputs.beta_version }}-${{ steps.date.outputs.date }}
+          name: Beta v${{ needs.check-beta.outputs.beta_version }} - ${{ steps.date.outputs.date }}
+          body: |
+            Automated daily beta builds of `bpy` v${{ needs.check-beta.outputs.beta_version }} from ${{ needs.check-beta.outputs.beta_branch }} branch
+
+            ## Installation
+            ```bash
+            pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
+            ```
+          draft: false
+          prerelease: true
           files: |
             ./artifacts/**/*.whl
         env:
