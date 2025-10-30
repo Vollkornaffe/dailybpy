@@ -79,7 +79,7 @@ jobs:
       
       - name: Patch platform_unix.cmake
         run: |
-          sed -i '400c\  list(FILTER _sycl_runtime_libraries EXCLUDE REGEX [.*\.py$])' build_files/cmake/platform/platform_unix.cmake
+          sed -i '400c\  list(FILTER _sycl_runtime_libraries EXCLUDE REGEX [.*\\.py$])' build_files/cmake/platform/platform_unix.cmake
 
       - name: Inject debug print into platform_unix.cmake
         if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
