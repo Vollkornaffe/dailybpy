@@ -90,6 +90,19 @@ jobs:
             echo "$FILE not found; skipping patch"
           fi
 
+      - name: Inject debug print into platform_unix.cmake
+        if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
+        run: |
+          FILE=build_files/cmake/platform/platform_unix.cmake
+          if [ -f "$FILE" ]; then
+            echo "Patching $FILE (inserting debug print after line 399)"
+            awk 'NR==399{print; print "message(STATUS \"_sycl_runtime_libraries=${_sycl_runtime_libraries}\")"; next} {print}' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+            echo "Patch applied. Showing context around insertion:"
+            sed -n '394,410p' "$FILE" || true
+          else
+            echo "$FILE not found; skipping patch"
+          fi
+
       - name: Update libraries
         if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
         run: |
