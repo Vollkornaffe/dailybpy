@@ -79,6 +79,19 @@ jobs:
             libx11-dev libxxf86vm-dev libxcursor-dev libxi-dev \
             libxrandr-dev libxinerama-dev libegl-dev \
             libwayland-dev wayland-protocols libxkbcommon-dev libdbus-1-dev linux-libc-dev
+            
+      - name: Inject debug print into platform_unix.cmake
+        if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
+        run: |
+          FILE=build_files/cmake/platform/platform_unix.cmake
+          if [ -f "$FILE" ]; then
+            echo "Patching $FILE (inserting debug print after line 401)"
+            awk 'NR==401{print; print "message(STATUS \"PLATFORM_BUNDLED_LIBRARIES=${PLATFORM_BUNDLED_LIBRARIES}\")"; print "message(FATAL_ERROR \"Halting build after printing PLATFORM_BUNDLED_LIBRARIES\")"; next} {print}' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+            echo "Patch applied. Showing context around insertion:"
+            sed -n '396,410p' "$FILE" || true
+          else
+            echo "$FILE not found; skipping patch"
+          fi
 
       - name: Update libraries
         if: matrix.branch == 'main' || needs.check-beta.outputs.beta_active == 'true'
