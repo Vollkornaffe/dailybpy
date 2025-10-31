@@ -11,11 +11,11 @@ A repo for these builds is hosted at `bradyajohnston.github.io/dailybpy` so you 
 
 #### `uv`
 ```bash
-uv pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
+uv pip install bpy --index-url https://bradyajohnston.github.io/dailybpy/
 ```
 #### `pip`
 ```bash
-pip install bpy --extra-index-url https://bradyajohnston.github.io/dailybpy/
+pip install bpy --index-url https://bradyajohnston.github.io/dailybpy/
 ```
 
 ### Project Configuration
